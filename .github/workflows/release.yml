@@ -1,0 +1,86 @@
+name: Build and release Edge TTS
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build plugin
+        if: github.ref_type != 'tag'
+        shell: pwsh
+        run: ./Plugins/build-package.ps1 -Project Plugins/EdgeTts/EdgeTts.csproj -OutputDirectory bin/package
+      - name: Build and verify signed release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          APEXCHATD_PLUGIN_SIGNING_KEY: ${{ secrets.APEXCHATD_PLUGIN_SIGNING_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = Get-Content -LiteralPath Plugins/EdgeTts/plugin.json -Raw | ConvertFrom-Json
+          if ($env:RELEASE_TAG -cne "v$($manifest.version)") {
+            throw 'The release tag must match the plugin manifest version.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:APEXCHATD_PLUGIN_SIGNING_KEY)) {
+            throw 'The repository signing secret is missing.'
+          }
+          $keyPath = Join-Path $env:RUNNER_TEMP ("apexchatd-edge-signing-" + [Guid]::NewGuid().ToString('N') + ".pem")
+          try {
+            [IO.File]::WriteAllText($keyPath, $env:APEXCHATD_PLUGIN_SIGNING_KEY)
+            Remove-Item Env:APEXCHATD_PLUGIN_SIGNING_KEY
+            ./Plugins/build-package.ps1 -Project Plugins/EdgeTts/EdgeTts.csproj -OutputDirectory bin/package `
+              -Zip bin/APEX-ChatD-Plugin-EdgeTTS.zip -SigningKey $keyPath
+          } finally {
+            [IO.File]::Delete($keyPath)
+          }
+          $rsa = [Security.Cryptography.RSA]::Create()
+          try {
+            $rsa.ImportFromPem([IO.File]::ReadAllText((Resolve-Path Assets/plugin-approval-public.pem).Path))
+            $data = [IO.File]::ReadAllBytes((Resolve-Path bin/package/plugin.json).Path)
+            $signature = [IO.File]::ReadAllBytes((Resolve-Path bin/package/plugin.sig).Path)
+            if (-not $rsa.VerifyData($data, $signature, [Security.Cryptography.HashAlgorithmName]::SHA256,
+              [Security.Cryptography.RSASignaturePadding]::Pkcs1)) {
+              throw 'The package signature does not match the public key trusted by APEX ChatD.'
+            }
+          } finally {
+            $rsa.Dispose()
+          }
+      - uses: actions/upload-artifact@v6
+        if: github.ref_type == 'tag'
+        with:
+          name: EdgeTTS
+          path: bin/APEX-ChatD-Plugin-EdgeTTS.zip
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: EdgeTTS
+      - name: Publish signed ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" APEX-ChatD-Plugin-EdgeTTS.zip --verify-tag --title "Edge TTS $RELEASE_TAG" --generate-notes

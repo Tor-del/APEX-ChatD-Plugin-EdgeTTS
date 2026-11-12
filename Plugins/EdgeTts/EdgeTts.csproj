@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AssemblyName>ApexChatd.EdgeTts</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../PluginSdk/Chatd.PluginSdk.csproj" Private="false" />
+    <ProjectReference Include="../../Vendor/ScreenReader.Edge/ScreenReader.Edge.csproj" />
+    <Content Include="THIRD-PARTY-NOTICES.md" CopyToPublishDirectory="PreserveNewest" Link="source/THIRD-PARTY-NOTICES.md" />
+    <Content Include="../../Vendor/Directory.Build.props" CopyToPublishDirectory="PreserveNewest" Link="source/Directory.Build.props" />
+    <Content Include="../../Vendor/ScreenReader.Edge/*.cs;../../Vendor/ScreenReader.Edge/*.csproj"
+             CopyToPublishDirectory="PreserveNewest" Link="source/ScreenReader.Edge/%(Filename)%(Extension)" />
+    <Content Include="../../Vendor/ScreenReader.Speech/*.cs;../../Vendor/ScreenReader.Speech/*.csproj"
+             CopyToPublishDirectory="PreserveNewest" Link="source/ScreenReader.Speech/%(Filename)%(Extension)" />
+    <Content Include="../../Vendor/licenses/edge-tts-LICENSE.txt;../../Vendor/licenses/GPL-3.0.txt"
+             CopyToPublishDirectory="PreserveNewest" Link="source/licenses/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

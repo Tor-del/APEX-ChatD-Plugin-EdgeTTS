@@ -1,0 +1,9 @@
+{
+  "id": "apexchatd.edge-tts",
+  "name": "Edge TTS",
+  "version": "1.0.0",
+  "entryAssembly": "ApexChatd.EdgeTts.dll",
+  "entryType": "ApexChatd.EdgeTts.EdgePlugin",
+  "minApiVersion": "1.0.0",
+  "maxApiVersionExclusive": "2.0.0"
+}
